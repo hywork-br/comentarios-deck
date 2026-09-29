@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comentar o deck · Hywork</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap">
+<style>
+/* Tema da "noite" Hywork, o mesmo do visualizador dos decks. */
+:root{--navy:#092938;--navy-2:#0d3347;--hair:#1d4356;--branco:#ffffff;--lavanda:#8ea1c7;--nevoa:#c9d7e0;--ambar:#f09c26;--laranja:#e9501b;
+  --t-body:"Noto Sans",Arial,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--navy);color:var(--branco);font:16px/1.55 var(--t-body);padding-inline:16px;padding-block:40px 64px}
+main{max-width:620px;margin-inline:auto;display:grid;gap:22px}
+.rot{font:700 12px/1.3 var(--t-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ambar);margin:0}
+h1{margin:6px 0 0;font-size:clamp(24px,5vw,32px);line-height:1.15;text-wrap:balance}
+.sub{margin:8px 0 0;color:var(--nevoa)}
+form{display:grid;gap:16px;background:var(--navy-2);border:1px solid var(--hair);border-radius:14px;padding:22px}
+label{display:grid;gap:6px;font-weight:600;font-size:14px}
+label span{color:var(--lavanda);font-weight:400}
+textarea,input{width:100%;font:16px/1.5 var(--t-body);color:var(--branco);background:var(--navy);border:1px solid var(--hair);border-radius:10px;padding:12px 14px}
+textarea{min-height:160px;resize:vertical}
+textarea:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--ambar);outline-offset:2px}
+.linha{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:520px){.linha{grid-template-columns:1fr}}
+button{appearance:none;border:0;border-radius:999px;background:var(--laranja);color:var(--branco);font:700 16px/1 var(--t-body);padding:15px 22px;min-height:48px;cursor:pointer;justify-self:start}
+button:disabled{opacity:.5;cursor:default}
+.estado{margin:0;font-size:15px}
+.estado.ok{color:var(--branco)}
+.estado.erro{color:var(--ambar)}
+.nota{color:var(--lavanda);font-size:13px;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="rot">Hywork · comentário no deck</p>
+    <h1 id="titulo">Comente o slide</h1>
+    <p class="sub" id="sub">O seu comentário chega à Hywork junto com o número do slide.</p>
+  </header>
+  <form id="form" novalidate>
+    <label for="texto">Comentário
+      <textarea id="texto" name="texto" maxlength="4000" required placeholder="O que mudaria, o que ficou confuso, o que faltou"></textarea>
+    </label>
+    <div class="linha">
+      <label for="nome">Nome <span>(opcional)</span><input id="nome" name="nome" maxlength="120" autocomplete="name"></label>
+      <label for="empresa">Empresa <span>(opcional)</span><input id="empresa" name="empresa" maxlength="120" autocomplete="organization"></label>
+    </div>
+    <label for="pagina">Slide
+      <input id="pagina" name="pagina" type="number" min="1" max="500" required inputmode="numeric">
+    </label>
+    <button type="submit" id="enviar">Enviar comentário</button>
+    <p class="estado" id="estado" role="status" aria-live="polite"></p>
+  </form>
+  <p class="nota">Só a equipe da Hywork lê os comentários. Para comentar outro slide, volte ao deck e use o botão daquele slide.</p>
+</main>
+<script src="config.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const DECKS = {comercial: 'deck comercial', pitch: 'pitch', pipeline: 'deck da Pipeline'};
+const deck = (q.get('deck') || 'comercial').replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'comercial';
+const pag = parseInt(q.get('p'), 10);
+const nomeDeck = DECKS[deck] || 'deck';
+document.getElementById('pagina').value = Number.isFinite(pag) && pag > 0 ? pag : '';
+const titulo = document.getElementById('titulo');
+const atualizarTitulo = () => {
+  const n = document.getElementById('pagina').value;
+  titulo.textContent = n ? 'Comente o slide ' + n + ' do ' + nomeDeck : 'Comente o ' + nomeDeck;
+};
+atualizarTitulo();
+document.getElementById('pagina').addEventListener('input', atualizarTitulo);
+try { const n = localStorage.getItem('hw-nome'); if (n) document.getElementById('nome').value = n; const e = localStorage.getItem('hw-empresa'); if (e) document.getElementById('empresa').value = e; } catch (e) {}
+
+const form = document.getElementById('form');
+const estado = document.getElementById('estado');
+const botao = document.getElementById('enviar');
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const texto = document.getElementById('texto').value.trim();
+  const pagina = parseInt(document.getElementById('pagina').value, 10);
+  const nome = document.getElementById('nome').value.trim();
+  const empresa = document.getElementById('empresa').value.trim();
+  estado.className = 'estado erro';
+  if (!texto) { estado.textContent = 'Escreva o comentário antes de enviar.'; return; }
+  if (!Number.isFinite(pagina) || pagina < 1) { estado.textContent = 'Informe o número do slide.'; return; }
+  botao.disabled = true; estado.className = 'estado'; estado.textContent = 'Enviando…';
+  try {
+    const r = await fetch(window.COMENTARIOS.url + '/rest/v1/rpc/enviar_comentario_deck', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', apikey: window.COMENTARIOS.chave},
+      body: JSON.stringify({p_deck: deck, p_pagina: pagina, p_texto: texto, p_nome: nome || null, p_empresa: empresa || null})
+    });
+    if (!r.ok) throw new Error(String(r.status));
+    try { localStorage.setItem('hw-nome', nome); localStorage.setItem('hw-empresa', empresa); } catch (e) {}
+    document.getElementById('texto').value = '';
+    estado.className = 'estado ok';
+    estado.textContent = 'Recebido, obrigado. Pode escrever outro comentário sobre este slide ou voltar ao deck.';
+  } catch (e) {
+    estado.className = 'estado erro';
+    estado.textContent = 'O comentário não foi enviado. Confira a conexão e tente de novo; o texto continua aqui.';
+  } finally { botao.disabled = false; }
+});
+</script>
+</body>
+</html>
