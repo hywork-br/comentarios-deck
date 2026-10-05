@@ -60,7 +60,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="config.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
-const DECKS = {comercial: 'deck comercial', pitch: 'pitch', pipeline: 'deck da Pipeline'};
+const DECKS = {comercial: 'deck comercial', people: 'deck do People', hystore: 'deck da HyStore', pitch: 'pitch', pipeline: 'deck da Pipeline'};
 const deck = (q.get('deck') || 'comercial').replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'comercial';
 const pag = parseInt(q.get('p'), 10);
 const nomeDeck = DECKS[deck] || 'deck';
